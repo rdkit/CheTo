@@ -6,7 +6,9 @@ CheTo (ChemicalTopic) allows to apply topic modeling, a method developed in the 
 
 Schneider, N.; Fechner, N.; Landrum, G. A.; Stiefl, N. *Chemical Topic Modeling: Exploring Molecular Data Sets Using a Common Text-Mining Approach*. J. Chem. Inf. Model. 2017, [http://pubs.acs.org/doi/10.1021/acs.jcim.7b00249](http://pubs.acs.org/doi/10.1021/acs.jcim.7b00249)
 
-The [supplementary](http://pubs.acs.org/doi/suppl/10.1021/acs.jcim.7b00249) of the paper contains exemplary data sets extracted from the [ChEMBL database](https://www.ebi.ac.uk/chembl/) and Jupyter notebooks to run the experiments described in the paper. 
+The [supplementary](http://pubs.acs.org/doi/suppl/10.1021/acs.jcim.7b00249) of the paper contains exemplary data sets extracted from the [ChEMBL database](https://www.ebi.ac.uk/chembl/) and Jupyter notebooks to run the experiments described in the paper.
+
+An interactive web page showing an exemplary topic model of data set A from our paper can be found here [http://www.t5informatics.com/Papers/InteractiveTopicModelDatasetA.html](http://www.t5informatics.com/Papers/InteractiveTopicModelDatasetA.html)
 
 **Installation**
 
