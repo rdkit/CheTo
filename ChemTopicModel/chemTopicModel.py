@@ -143,7 +143,7 @@ class ChemTopicModel:
         self.vocabulary = sorted(n for n,i in zip(keys,normFragOcc) if i != 0)
         self.fragIdx=dict((i,j) for j,i in enumerate(self.vocabulary))
         if self.verbose:
-            print('Created vocabulary, size: {0}, used sample size: {1}'.format(len(self.vocabulary),len(molSample)))
+            print('Created alphabet, size: {0}, used sample size: {1}'.format(len(self.alphabet),len(molSample)))
     
     # generate the fragment templates important for the visualisation of the topics later
     def _generateFragmentTemplates(self,molSample):
@@ -242,44 +242,63 @@ class ChemTopicModel:
         self._generateFragmentMatrix()
         
     # it is better use these functions instead of buildTopicModel if the dataset is larger   
-    def fitTopicModel(self, numTopics, max_iter=100, **kwargs):
+    def fitTopicModel(self, numTopics, max_iter=100, nJobs=1, sizeFittingDataset=1.0, **kwargs):
 
         self.lda = LatentDirichletAllocation(n_topics=numTopics,learning_method=self.learningMethod,random_state=self.seed,
-                                             n_jobs=1, max_iter=max_iter, batch_size=self.chunksize, **kwargs)
-        if self.fragM.shape[0] > self.chunksize:
+                                             n_jobs=nJobs, max_iter=max_iter, batch_size=self.chunksize, **kwargs)
+        
+        inputMatrix=self.fragM 
+        if sizeFittingDataset < 1.0:         
+            
+            np.random.seed(self.seed)
+            upperIndex = self.fragM.shape[0]-1
+            size = int(self.fragM.shape[0]*sizeFittingDataset)
+            ids = np.random.randint(0,upperIndex, size=size)
+            inputMatrix = self.fragM[sorted(ids)]
+        
+        if inputMatrix.shape[0] > self.chunksize:
             # fit the model in chunks
             self.lda.learning_method = 'online'
-            self.lda.fit(self.fragM)
-        else:
-            self.lda.fit(self.fragM)
+        self.lda.fit(inputMatrix)
 
-    def transformDataToTopicModel(self):
+    def transformDataToTopicModel(self,lowerPrecision=False):
         
         try:
             self.lda
         except:
             raise ValueError('No topic model is available')
+            
+        if lowerPrecision:
+            print('WARNING: using lower precision mode')
 
         if self.fragM.shape[0] > self.chunksize:
             # after fitting transform the data to our model
             for chunk in self._generateMatrixChunks(0,self.fragM.shape[0],chunksize=self.chunksize):
                 resultLDA = self.lda.transform(chunk[0])
-                # here using a 16bit float instead of the 64bit float would save memory and might be enough precision. Test that later!!
+                # here using a 32bit float instead of the 64bit float would save memory and might be enough precision. Test that later!!
                 if chunk[1] > 0:
-                    self.documentTopicProbabilities = np.concatenate((self.documentTopicProbabilities,
+                    if lowerPrecision:
+                        self.documentTopicProbabilities = np.concatenate((self.documentTopicProbabilities,
+                                                                 (resultLDA/resultLDA.sum(axis=1,keepdims=1)).astype(np.float32)), axis=0)
+                    else:
+                        self.documentTopicProbabilities = np.concatenate((self.documentTopicProbabilities,
                                                                  resultLDA/resultLDA.sum(axis=1,keepdims=1)), axis=0)
                 else:
                     self.documentTopicProbabilities = resultLDA/resultLDA.sum(axis=1,keepdims=1)
+                    if lowerPrecision:
+                        self.documentTopicProbabilities = self.documentTopicProbabilities.astype(np.float32)
         else:
             resultLDA = self.lda.transform(self.fragM)
             self.documentTopicProbabilities = resultLDA/resultLDA.sum(axis=1,keepdims=1)
+            if lowerPrecision:
+                self.documentTopicProbabilities = self.documentTopicProbabilities.astype(np.float32)
             
     
     # use this if the dataset is small- to medium-sized   
-    def buildTopicModel(self, numTopics, max_iter=100, **kwargs):
+    def buildTopicModel(self, numTopics, max_iter=100, nJobs=1, lowerPrecision=False, sizeFittingDataset=0.1, **kwargs):
         
-        self.fitTopicModel(numTopics, max_iter=max_iter, **kwargs)
-        self.transformDataToTopicModel()
+        self.fitTopicModel(numTopics, max_iter=max_iter, nJobs=nJobs, sizeFittingDataset=sizeFittingDataset, **kwargs)
+        self.transformDataToTopicModel(lowerPrecision=lowerPrecision)
             
         
     def getTopicFragmentProbabilities(self):
@@ -289,4 +308,5 @@ class ChemTopicModel:
         except:
             raise ValueError('No topic model is available')
         return self.lda.components_/self.lda.components_.sum(axis=1,keepdims=1)
-        
+                
+                
