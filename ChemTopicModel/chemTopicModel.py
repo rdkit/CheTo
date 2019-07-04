@@ -244,7 +244,7 @@ class ChemTopicModel:
     # it is better use these functions instead of buildTopicModel if the dataset is larger   
     def fitTopicModel(self, numTopics, max_iter=100, nJobs=1, sizeFittingDataset=1.0, **kwargs):
 
-        self.lda = LatentDirichletAllocation(n_topics=numTopics,learning_method=self.learningMethod,random_state=self.seed,
+        self.lda = LatentDirichletAllocation(n_components=numTopics,learning_method=self.learningMethod,random_state=self.seed,
                                              n_jobs=nJobs, max_iter=max_iter, batch_size=self.chunksize, **kwargs)
         
         inputMatrix=self.fragM 
@@ -289,7 +289,9 @@ class ChemTopicModel:
                         self.documentTopicProbabilities = self.documentTopicProbabilities.astype(np.float32)
         else:
             resultLDA = self.lda.transform(self.fragM)
-            self.documentTopicProbabilities = resultLDA/resultLDA.sum(axis=1,keepdims=1)
+            # next line is not need anymore since it is normalized in sklearn already since version 0.18
+            # self.documentTopicProbabilities = resultLDA/resultLDA.sum(axis=1,keepdims=1)
+            self.documentTopicProbabilities = resultLDA
             if lowerPrecision:
                 self.documentTopicProbabilities = self.documentTopicProbabilities.astype(np.float32)
             
