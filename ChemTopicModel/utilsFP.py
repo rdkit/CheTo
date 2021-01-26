@@ -36,6 +36,7 @@ from rdkit.Chem import AllChem
 
 import copy
 from collections import defaultdict
+import hashlib
 
 def getMorganEnvironment(mol, bitInfo, fp=None, minRad=0):
     """
@@ -44,13 +45,13 @@ def getMorganEnvironment(mol, bitInfo, fp=None, minRad=0):
     >>> bi = {}
     >>> fp = AllChem.GetMorganFingerprintAsBitVect(m,2,2048,bitInfo=bi)
     >>> getMorganEnvironment(m,bi)
-    defaultdict(<class 'list'>, {1057: [[], []], 227: [[1]], 709: [[0, 1, 2]], 1: [[]], 283: [[0], [2]], 807: [[]]})
+    defaultdict(<class 'list'>, {1: [[]], 227: [[1]], 283: [[0], [2]], 709: [[0, 1, 2]], 807: [[]], 1057: [[], []]})
     >>> getMorganEnvironment(m,bi,minRad=1)
-    defaultdict(<class 'list'>, {283: [[0], [2]], 227: [[1]], 709: [[0, 1, 2]]})
+    defaultdict(<class 'list'>, {227: [[1]], 283: [[0], [2]], 709: [[0, 1, 2]]})
     >>> list(fp.GetOnBits())
     [1, 227, 283, 709, 807, 1057]
     >>> getMorganEnvironment(m,bi,minRad=1,fp=fp)
-    defaultdict(<class 'list'>, {283: [[0], [2]], 227: [[1]], 709: [[0, 1, 2]]})
+    defaultdict(<class 'list'>, {227: [[1]], 283: [[0], [2]], 709: [[0, 1, 2]]})
     >>> list(fp.GetOnBits())
     [227, 283, 709]
 
@@ -119,7 +120,7 @@ def generateAtomInvariant(mol):
     """
 
     >>> generateAtomInvariant(Chem.MolFromSmiles("Cc1ncccc1"))
-    [341294046, 3184205312, 522345510, 1545984525, 1545984525, 1545984525, 1545984525]
+    [346999948, 3963180082, 3525326240, 2490398925, 2490398925, 2490398925, 2490398925]
 
     """
     num_atoms = mol.GetNumAtoms()
@@ -131,7 +132,7 @@ def generateAtomInvariant(mol):
         descriptors.append(a.GetTotalNumHs())
         descriptors.append(a.IsInRing())
         descriptors.append(a.GetIsAromatic())
-        invariants[i]=hash(tuple(descriptors))& 0xffffffff
+        invariants[i]=int(hashlib.sha256(str(descriptors).encode('utf-8')).hexdigest(),16)& 0xffffffff
     return invariants
 
 
