@@ -39,7 +39,7 @@ import re
 
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-from sklearn.externals.joblib import Parallel, delayed
+from joblib import Parallel, delayed
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdqueries, BRICS
@@ -244,7 +244,7 @@ class ChemTopicModel:
     # it is better use these functions instead of buildTopicModel if the dataset is larger   
     def fitTopicModel(self, numTopics, max_iter=100, **kwargs):
 
-        self.lda = LatentDirichletAllocation(n_topics=numTopics,learning_method=self.learningMethod,random_state=self.seed,
+        self.lda = LatentDirichletAllocation(n_components=numTopics,learning_method=self.learningMethod,random_state=self.seed,
                                              n_jobs=1, max_iter=max_iter, batch_size=self.chunksize, **kwargs)
         if self.fragM.shape[0] > self.chunksize:
             # fit the model in chunks
