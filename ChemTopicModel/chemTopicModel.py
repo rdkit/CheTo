@@ -39,7 +39,7 @@ import re
 
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-from sklearn.externals.joblib import Parallel, delayed
+from joblib import Parallel, delayed
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdqueries, BRICS
