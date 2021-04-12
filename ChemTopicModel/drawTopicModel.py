@@ -34,6 +34,8 @@
 from rdkit import Chem
 from rdkit.Chem import rdqueries
 from rdkit.Chem.Draw import rdMolDraw2D
+from rdkit.Chem import rdDepictor
+
 from IPython.display import display,HTML,SVG
 
 from collections import defaultdict
@@ -97,7 +99,7 @@ def _getAtomWeights(mol, molID, topicID, topicModel):
 
 # hightlight a topic in a molecule
 def drawTopicWeightsMolecule(mol, molID, topicID, topicModel, molSize=(450,200), kekulize=True,\
-                             baseRad=0.1, color=(.9,.9,.9)):
+                             baseRad=0.1, color=(.9,.9,.9), fontSize=0.9):
 
     # get the atom weights
     atomWeights,maxWeightTopic=_getAtomWeights(mol, molID, topicID, topicModel)
@@ -112,9 +114,14 @@ def drawTopicWeightsMolecule(mol, molID, topicID, topicModel, molSize=(450,200),
 
             if atRads[at] > 0 and atRads[at] < 0.2:
                 atRads[at] = 0.2
+                
+    try:
+        mc = rdMolDraw2D.PrepareMolForDrawing(mol, kekulize=kekulize)
+    except ValueError:  # <- can happen on a kekulization failure
+        mc = rdMolDraw2D.PrepareMolForDrawing(mol, kekulize=False)   
 
-    mc = rdMolDraw2D.PrepareMolForDrawing(mol, kekulize=kekulize)
     drawer = rdMolDraw2D.MolDraw2DSVG(molSize[0],molSize[1])
+    drawer.SetFontSize(fontSize)
     drawer.DrawMolecule(mc,highlightAtoms=atColors.keys(),
                         highlightAtomColors=atColors,highlightAtomRadii=atRads,
                         highlightBonds=[])
@@ -124,28 +131,34 @@ def drawTopicWeightsMolecule(mol, molID, topicID, topicModel, molSize=(450,200),
 
 # generates all svgs of molecules belonging to a certain topic and highlights this topic within the molecule
 def generateMoleculeSVGsbyTopicIdx(topicModel, topicIdx, idsLabelToShow=[0], topicProbThreshold = 0.5, baseRad=0.5,\
-                                    molSize=(250,150),color=(.0,.0, 1.),maxMols=100):
+                                    molSize=(250,150),color=(.0,.0, 1.),maxMols=100, fontSize=0.9, maxTopicProb=0.5):
     svgs=[]
     namesSVGs=[]
     numDocs, numTopics = topicModel.documentTopicProbabilities.shape
     
     if topicIdx >= numTopics:
         return "Topic not found"
-    molset = topicModel.documentTopicProbabilities[:,topicIdx].argsort()[::-1][:maxMols]
-    for doc in molset:
-        if topicModel.documentTopicProbabilities[doc,topicIdx] >= topicProbThreshold:
-            data = topicModel.moldata.iloc[doc]
-            smi = data['smiles']
-            name = ''
-            for idx in idsLabelToShow:
-                name += str(data['label_'+str(idx)])
-                name += ' | '
-            mol = Chem.MolFromSmiles(smi)
-            topicProb = topicModel.documentTopicProbabilities[doc,topicIdx]   
-            svg = drawTopicWeightsMolecule(mol, doc, topicIdx, topicModel, molSize=molSize, baseRad=baseRad, color=color)
-            svgs.append(svg)
-            maxTopicID= np.argmax(topicModel.documentTopicProbabilities[doc,:])
-            namesSVGs.append(str(name)+"(p="+str(round(topicProb,2))+")")
+    tmp=topicModel.documentTopicProbabilities[:,topicIdx]
+    ids=np.where(tmp >= topicProbThreshold)
+    molset = sorted(list(zip(tmp[ids].tolist(),ids[0].tolist())), reverse=True)[:maxMols]
+    if maxTopicProb > topicProbThreshold:
+        ids=np.where((tmp >= topicProbThreshold) & (tmp < maxTopicProb))
+        molset = sorted(list(zip(tmp[ids].tolist(),ids[0].tolist())), reverse=False)[:maxMols]    
+    
+    for prob,doc in molset:
+        data = topicModel.moldata.iloc[doc]
+        smi = data['smiles']
+        name = ''
+        for idx in idsLabelToShow:
+            name += str(data['label_'+str(idx)])
+            name += ' | '
+        mol = Chem.MolFromSmiles(smi)
+        topicProb = prob #topicModel.documentTopicProbabilities[doc,topicIdx]
+        svg = drawTopicWeightsMolecule(mol, doc, topicIdx, topicModel, molSize=molSize, baseRad=baseRad, color=color, fontSize=fontSize)
+        svgs.append(svg)
+        maxTopicID= np.argmax(topicModel.documentTopicProbabilities[doc])
+        maxProb = np.max(topicModel.documentTopicProbabilities[doc])
+        namesSVGs.append('{0}(p={1:.2f}) | (pmax({2})={3:.2f})'.format(name,topicProb,maxTopicID,maxProb))
     if not len(svgs):
         #print('No molecules can be drawn')
         return [],[]
@@ -220,10 +233,10 @@ def generateSVGGridMolsByLabel(topicModel, label, idLabelToMatch=0, baseRad=0.5,
 
 # draws molecules belonging to a certain topic in a html table and highlights this topic within the molecules
 def drawMolsByTopic(topicModel, topicIdx, idsLabelToShow=[0], topicProbThreshold = 0.5, baseRad=0.5, molSize=(250,150),\
-                    numRowsShown=3, color=(.0,.0, 1.), maxMols=100):
+                    numRowsShown=3, color=(.0,.0, 1.), maxMols=100, fontSize=0.9,maxTopicProb=0.5):
     result = generateMoleculeSVGsbyTopicIdx(topicModel, topicIdx, idsLabelToShow=idsLabelToShow, \
                                              topicProbThreshold = topicProbThreshold, baseRad=baseRad,\
-                                             molSize=molSize,color=color, maxMols=maxMols)
+                                             molSize=molSize,color=color, maxMols=maxMols,fontSize=fontSize,maxTopicProb=maxTopicProb)
     if len(result)  == 1:
         print(result)
         return
@@ -242,11 +255,11 @@ def drawMolsByTopic(topicModel, topicIdx, idsLabelToShow=[0], topicProbThreshold
 
 # produces a svg grid of the molecules belonging to a certain topic and highlights this topic within the molecules
 def generateSVGGridMolsbyTopic(topicModel, topicIdx, idsLabelToShow=[0], topicProbThreshold = 0.5, baseRad=0.5, \
-                                 molSize=(250,150), svgsPerRow=4, color=(1.,1.,1.)):
+                                 molSize=(250,150), svgsPerRow=4, color=(1.,1.,1.), maxMols=100, fontSize=0.9, maxTopicProb=0.5):
     
     result = generateMoleculeSVGsbyTopicIdx(topicModel, topicIdx, idsLabelToShow=idsLabelToShow, \
                                              topicProbThreshold = topicProbThreshold, baseRad=baseRad,\
-                                             molSize=molSize,color=color)
+                                             molSize=molSize,color=color, maxMols=maxMols, fontSize=fontSize, maxTopicProb=maxTopicProb)
     if len(result)  == 1:
         print(result)
         return
@@ -259,9 +272,24 @@ def generateSVGGridMolsbyTopic(topicModel, topicIdx, idsLabelToShow=[0], topicPr
 
 ####### Fragments ##########################
 
+
+# produces a svg grid of the fragemnts belonging to a certain topic
+def generateSVGGridFragemntsForTopic(topicModel, topicIdx, n_top_frags=10, molSize=(100,100),\
+                                     svg=True, prior=-1.0, fontSize=0.9,svgsPerRow=4):
+    
+    svgs = generateTopicRelatedFragmentSVGs(topicModel, topicIdx, n_top_frags=n_top_frags, molSize=molSize,\
+                                     svg=svg, prior=prior, fontSize=fontSize)
+    scores = topicModel.getTopicFragmentProbabilities()
+    namesSVGs = list(map(lambda x: "p(k={0})={1:.2f}".format(topicIdx,x), \
+                filter(lambda y: y > prior, sorted(scores[topicIdx,:], reverse=True)[:n_top_frags])))
+            
+    svgGrid = utilsDrawing.SvgsToGrid(svgs, namesSVGs, svgsPerRow=svgsPerRow, molSize=molSize)
+    
+    return svgGrid
+
 # generates svgs of the fragments related to a certain topic
 def generateTopicRelatedFragmentSVGs(topicModel, topicIdx, n_top_frags=10, molSize=(100,100),\
-                                     svg=True, prior=-1.0):
+                                     svg=True, prior=-1.0, fontSize=0.9):
     svgs=[]
     probs = topicModel.getTopicFragmentProbabilities()
     numTopics, numFragments = probs.shape
@@ -271,12 +299,18 @@ def generateTopicRelatedFragmentSVGs(topicModel, topicIdx, n_top_frags=10, molSi
     for i in probs[topicIdx,:].argsort()[::-1][:n_top_frags]:
         if probs[topicIdx,i] > prior:
             bit = topicModel.vocabulary[i]
+            
+            # allows including words
+            if type(bit) != int:
+                svgs.append(bit)
+                continue
+            
             # draw the bits using the templates
             if topicModel.fragmentMethod in ['Morgan', 'RDK']:
                 templMol = topicModel.fragmentTemplates.loc[topicModel.fragmentTemplates['bitIdx'] == bit]['templateMol'].item()
                 pathTemplMol = topicModel.fragmentTemplates.loc[topicModel.fragmentTemplates['bitIdx'] == bit]['bitPathTemplateMol'].item()
                 if svg:
-                    svgs.append(drawFPBits.drawFPBit(templMol,pathTemplMol,molSize=molSize))
+                    svgs.append(drawFPBits.drawFPBit(templMol,pathTemplMol,molSize=molSize, fontSize=fontSize))
                 else:
                     svgs.append(drawFPBits.drawFPBitPNG(templMol,pathTemplMol,molSize=molSize))
             else:
@@ -288,14 +322,14 @@ def generateTopicRelatedFragmentSVGs(topicModel, topicIdx, n_top_frags=10, molSi
 
 # draw the svgs of the fragments related to a certain topic in a html table
 def drawFragmentsbyTopic(topicModel, topicIdx, n_top_frags=10, numRowsShown=4, cssTableName='fragTab', \
-                         prior=-1.0, numColumns=4, tableHeader=''):    
+                         prior=-1.0, numColumns=4, tableHeader='',fontSize=0.9):    
     
     scores = topicModel.getTopicFragmentProbabilities()
     numTopics, numFragments = scores.shape
     if prior < 0:
         prior = 1./numFragments
-    svgs=generateTopicRelatedFragmentSVGs(topicModel, topicIdx, n_top_frags=n_top_frags, prior=prior)
-    namesSVGs = list(map(lambda x: "Score %.2f" % x, \
+    svgs=generateTopicRelatedFragmentSVGs(topicModel, topicIdx, n_top_frags=n_top_frags, prior=prior,fontSize=fontSize)
+    namesSVGs = list(map(lambda x: "p(k={0})={1:.2f}".format(topicIdx,x), \
                     filter(lambda y: y > prior, sorted(scores[topicIdx,:], reverse=True)[:n_top_frags])))
     if tableHeader == '':
         tableHeader = "Topic "+str(topicIdx)

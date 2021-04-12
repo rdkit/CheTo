@@ -43,7 +43,7 @@ PandasTools.RenderImagesInAllDataFrames(images=True)
 def drawSVGsToHTMLGrid(svgs, cssTableName='default', tableHeader='', namesSVGs=[], size=(150,150), numColumns=4, numRowsShown=2, noHeader=False):
     rows=[]
     names=copy.deepcopy(namesSVGs)
-    rows = [SVG(i).data for i in svgs]
+    rows = [SVG(i).data if i.startswith('<?xml version') else i for i in svgs]
     d=int(len(rows)/numColumns)
     x=len(rows)%numColumns
     if x > 0:

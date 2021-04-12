@@ -38,7 +38,7 @@ from rdkit.Chem import rdDepictor
 import numpy as np
 import re
 
-def _drawFPBit(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,svg=True,**kwargs):
+def _drawFPBit(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,svg=True, fontSize=0.9,**kwargs):
     mol = Chem.MolFromSmiles(smi)
     rdDepictor.Compute2DCoords(mol)
 
@@ -82,7 +82,7 @@ def _drawFPBit(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,svg=True
     else:
         drawer = rdMolDraw2D.MolDraw2DCairo(molSize[0],molSize[1])
         
-    
+    drawer.SetFontSize(fontSize)
     drawopt=drawer.drawOptions()
     drawopt.continuousHighlight=False
     
@@ -118,7 +118,7 @@ def _drawFPBit(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,svg=True
 def drawFPBitPNG(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,**kwargs):   
     return _drawFPBit(smi,bitPath,molSize=molSize,kekulize=kekulize,baseRad=baseRad, svg=False,**kwargs)
     
-def drawFPBit(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,**kwargs):   
+def drawFPBit(smi,bitPath,molSize=(150,150),kekulize=True,baseRad=0.05,fontSize=0.9,**kwargs):   
     svg = _drawFPBit(smi,bitPath,molSize=molSize,kekulize=kekulize,baseRad=baseRad,**kwargs)
     return svg.replace('svg:','')
 
